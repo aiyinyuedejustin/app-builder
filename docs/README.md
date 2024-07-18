@@ -1,23 +1,31 @@
 # AppBuilder-SDK Documentataion
 
 ## Github 文档
-- [快速开始](./quick_start/README.md)
-    - [安装说明](./quick_start/install.md)
-    - [版本说明](./quick_start/changelog.md)
-- [基础功能](./basic_module/README.md)
-    - [模型列表获取](./basic_module/get_model_list.md)
-    - [基础能力组件](./basic_module/components.md)
-    - [流程编排](./basic_module/assistant_sdk.md)
-    - [端到端应用](./basic_module/appbuilder_client.md)
-    - [知识库管理](./basic_module/dataset.md)
-- [进阶实践](./advanced_application/README.md)
-    - [CookBooks](../cookbooks/README.md)
-- [服务化部署](./service/README.md)
-    - [API调用](./service/flask.md)
-    - [交互式服务](./service/chainlit.md)
-    - [公有云部署](./service/cloud.md)
-- [二次开发](./develop_guide/README.md)
-    - [AppBuilder SDK 运行环境超参配置说明](./develop_guide/env.md)
+- [快速开始](https://github.com/baidubce/app-builder/blob/master/docs/quick_start/README.md)
+    - [安装说明](https://github.com/baidubce/app-builder/blob/master/docs/quick_start/install.md)
+    - [版本说明](https://github.com/baidubce/app-builder/blob/master/docs/quick_start/changelog.md)
+- [基础功能](https://github.com/baidubce/app-builder/blob/master/docs/basic_module/README.md)
+    - 平台功能 SDK: 支持Pyhon/Java/Go
+        - [应用管理](https://github.com/baidubce/app-builder/blob/master/docs/basic_module/get_app_list.md)
+        - [应用调用 AppBuilderClient SDK](https://github.com/baidubce/app-builder/blob/master/docs/basic_module/appbuilder_client.md) 
+        - [知识库管理 KnowledgeBase SDK](https://github.com/baidubce/app-builder/blob/master/docs/basic_module/knowledgebase.md)
+    - Assistant SDK：支持Python
+        - [Assistant SDK 快速开始](https://github.com/baidubce/app-builder/blob/master/docs/basic_module/assistant_sdk.md)
+        - [Assistant SDK API说明](https://github.com/baidubce/app-builder/blob/master/docs/basic_module/assistant_type.md)
+    - AI基础能力组件 SDK：支持Python
+        - [获取模型列表](https://github.com/baidubce/app-builder/blob/master/docs/basic_module/get_model_list.md)
+        - [基础能力组件](https://github.com/baidubce/app-builder/blob/master/docs/basic_module/components.md)
+- [进阶实践](https://github.com/baidubce/app-builder/blob/master/docs/advanced_application/README.md)
+    - [CookBooks](https://github.com/baidubce/app-builder/blob/master/cookbooks/README.md)
+    - [Appbuilder-SDK Trace跟踪功能](https://github.com/baidubce/app-builder/blob/master/docs/trace/READED.md)
+      - [Appbuilder-SDK Trace基础用法](https://github.com/baidubce/app-builder/blob/master/docs/trace/basic.md)
+      - [Appbuilder-SDK Trace进阶用法](https://github.com/baidubce/app-builder/blob/master/docs/trace/phoenix_method.md)
+- [SDK服务化部署](https://github.com/baidubce/app-builder/blob/master/docs/service/README.md)
+    - [API调用](https://github.com/baidubce/app-builder/blob/master/docs/service/flask.md)
+    - [交互式服务](https://github.com/baidubce/app-builder/blob/master/docs/service/chainlit.md)
+    - [公有云部署](https://github.com/baidubce/app-builder/blob/master/docs/service/cloud.md)
+- [二次开发](https://github.com/baidubce/app-builder/blob/master/docs/develop_guide/README.md)
+    - [AppBuilder SDK 运行环境超参配置说明](https://github.com/baidubce/app-builder/blob/master/docs/develop_guide/env.md)
 
 
 ## 平台文档

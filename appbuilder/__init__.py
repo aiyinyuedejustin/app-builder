@@ -13,8 +13,9 @@
 # limitations under the License.
 
 
-__version__ = '0.8.0'
+__version__ = '0.9.0'
 
+import os
 import sys
 import copy
 import pydantic
@@ -41,6 +42,7 @@ checker.current_version
 class SDKReportConfig(pydantic.BaseModel):
     appbuilder_sdk_version: str = __version__
     appbuilder_sdk_language: str = "python"
+    appbuilder_sdk_platform: str = os.environ.get("APPBUILDER_SDK_PLATFORM", "unknown")
 
 
 # report information
@@ -118,6 +120,9 @@ from appbuilder.core.utils import get_model_list
 
 from appbuilder.core.console.appbuilder_client.appbuilder_client import AppBuilderClient
 from appbuilder.core.console.appbuilder_client.appbuilder_client import AgentBuilder
+from appbuilder.core.console.appbuilder_client.appbuilder_client import get_app_list
+from appbuilder.core.console.knowledge_base.knowledge_base import KnowledgeBase
+from appbuilder.core.console.knowledge_base.data_class import CustomProcessRule
 
 from .core._exception import (
     BadRequestException,
@@ -133,6 +138,8 @@ from appbuilder.core.assistant.base import assistant
 from appbuilder.core.assistant.threads.runs import StreamRunContext
 from appbuilder.core.assistant.threads.runs import AssistantEventHandler
 from appbuilder.core.assistant.threads.runs import AssistantStreamManager
+
+from appbuilder.utils.trace.tracer import AppBuilderTracer, AppbuilderInstrumentor
 
 __all__ = [
     'logger',
@@ -190,11 +197,21 @@ __all__ = [
     "HandwriteOCR",
     "ImageUnderstand",
     "MixCardOCR",
+
+    "get_model_list",
+
     "AppBuilderClient",
     "AgentBuilder",
+    "get_app_list",
+
+    "KnowledgeBase",
+    "CustomProcessRule",
 
     "assistant",
     "StreamRunContext",
     "AssistantEventHandler",
-    "AssistantStreamManager"
+    "AssistantStreamManager",
+
+    "AppBuilderTracer",
+    "AppbuilderInstrumentor"
 ]

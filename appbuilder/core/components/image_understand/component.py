@@ -22,6 +22,7 @@ from appbuilder.core._client import HTTPClient
 from appbuilder.core._exception import AppBuilderServerException
 from appbuilder.core.components.image_understand.model import *
 from typing import Generator, Union
+from appbuilder.utils.trace.tracer_wrapper import components_run_trace, components_run_stream_trace
 
 
 class ImageUnderstand(Component):
@@ -80,6 +81,7 @@ class ImageUnderstand(Component):
     ]
 
     @HTTPClient.check_param
+    @components_run_trace
     def run(self, message: Message, timeout: float = None, retry: int = 0) -> Message:
         r""" 执行图像内容理解
 
@@ -139,6 +141,7 @@ class ImageUnderstand(Component):
         data = response.json()
         self.http_client.check_response_json(data)
         request_id = self.http_client.response_request_id(response)
+        self.__class__.__check_create_task_service_error(request_id, data)
         task = ImageUnderstandTask(data, request_id=request_id)
         task_id = task.result.get("task_id", "")
         if task_id == "":
@@ -160,6 +163,7 @@ class ImageUnderstand(Component):
                 # 避免触发限流（>1QPS），等待1.1秒
                 time.sleep(1.1)
 
+    @components_run_stream_trace
     def tool_eval(
         self,
         name: str,
@@ -243,4 +247,22 @@ class ImageUnderstand(Component):
                 service_err_code=data.get("ret_code", ""),
                 service_err_message=data.get("ret_msg", "")
             )
+
+    @staticmethod
+    def __check_create_task_service_error(request_id: str, data: dict):
+        r"""个性化服务response参数检查
+            参数:
+                request_id (str) : 任务请求ID
+                data (dict): 响应数据
+            返回：
+                无
+        """
+
+        if "error_code" in data and "error_msg" in data:
+            raise AppBuilderServerException(
+                request_id=request_id,
+                service_err_code=data.get("error_code", ""),
+                service_err_message=data.get("error_msg", "")
+            )
+
 

@@ -1,5 +1,6 @@
 package com.baidubce.appbuilder.base.utils.http;
 
+import com.baidubce.appbuilder.base.component.Component;
 import com.baidubce.appbuilder.base.config.AppBuilderConfig;
 import com.baidubce.appbuilder.base.exception.AppBuilderServerException;
 import com.baidubce.appbuilder.base.utils.iterator.StreamIterator;
@@ -7,13 +8,19 @@ import com.baidubce.appbuilder.base.utils.json.JsonUtils;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.net.URLEncoder;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.UUID;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.FileHandler;
+import java.util.logging.Logger;
 
+import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
@@ -28,7 +35,12 @@ public class HttpClient {
     public String SecretKey;
     public String Gateway;
     public String GatewayV2;
+    public String ConsoleOpenAPIVersion;
+    public String ConsoleOpenAPIPrefix;
+
+    
     private final CloseableHttpClient client;
+    private static final Logger LOGGER = Logger.getLogger(Component.class.getName());
 
     public HttpClient(String secretKey, String gateway, String gatewayV2) {
         RequestConfig requestConfig = RequestConfig.custom()
@@ -38,17 +50,70 @@ public class HttpClient {
         this.SecretKey = secretKey;
         this.Gateway = gateway;
         this.GatewayV2 = gatewayV2;
+
+        ConsoleHandler handler = new ConsoleHandler();
+        String systemLogLevel = System.getProperty(AppBuilderConfig.APPBUILDER_LOGLEVEL);
+        if (systemLogLevel == null || systemLogLevel.isEmpty()){
+            systemLogLevel = System.getenv(AppBuilderConfig.APPBUILDER_LOGLEVEL);
+        }
+        if (systemLogLevel == null || systemLogLevel.isEmpty()) {
+            LOGGER.setLevel(Level.INFO);
+            handler.setLevel(Level.INFO);
+        } else {
+            switch (systemLogLevel.toLowerCase()) {
+                case "debug":
+                    LOGGER.setLevel(Level.FINE);
+                    handler.setLevel(Level.FINE);
+                    break;
+                case "warning":
+                    LOGGER.setLevel(Level.WARNING);
+                    handler.setLevel(Level.WARNING);
+                    break;
+                case "error":
+                    LOGGER.setLevel(Level.SEVERE);
+                    handler.setLevel(Level.SEVERE);
+                    break;
+                default:
+                    LOGGER.setLevel(Level.INFO);
+                    handler.setLevel(Level.INFO);
+                    break;
+            }
+        }
+        LOGGER.addHandler(handler);
+
+        String systemLogFile = System.getProperty(AppBuilderConfig.APPBUILDER_LOGFILE);
+        if (systemLogFile == null || systemLogFile.isEmpty()) {
+            systemLogFile = System.getenv(AppBuilderConfig.APPBUILDER_LOGFILE);
+        }
+
+        if (systemLogFile != null && !systemLogFile.isEmpty()) {
+            try {
+                FileHandler fileHandler = new FileHandler(systemLogFile);
+                LOGGER.addHandler(fileHandler);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create log file: " + systemLogFile, e); 
+            }
+        }
     }
 
     public ClassicHttpRequest createPostRequest(String url, HttpEntity entity) {
         String requestURL = Gateway + url;
+        LOGGER.log(Level.FINE, "requestURL: " + requestURL);
         HttpPost httpPost = new HttpPost(requestURL);
         httpPost.setHeader("X-Appbuilder-Authorization", this.SecretKey);
         httpPost.setHeader("X-Appbuilder-Origin", "appbuilder_sdk");
+        String platform = System.getenv("APPBUILDER_SDK_PLATFORM") != null ? System.getenv("APPBUILDER_SDK_PLATFORM")
+                : "unknown";
         httpPost.setHeader("X-Appbuilder-Sdk-Config",
-                "{\"appbuilder_sdk_version\":\"0.8.0\",\"appbuilder_sdk_language\":\"java\"}");
+                "{\"appbuilder_sdk_version\":\"0.9.0\",\"appbuilder_sdk_language\":\"java\",\"appbuilder_sdk_platform\":\""
+                        + platform + "\"}");
         httpPost.setHeader("X-Appbuilder-Request-Id", java.util.UUID.randomUUID().toString());
         httpPost.setEntity(entity);
+        String headers = "headers: \n";
+        for (Header header : httpPost.getHeaders()) {
+            headers += header + "\n";
+        }
+        LOGGER.log(Level.FINE, "\n" + headers);
         return httpPost;
     }
 
@@ -61,18 +126,72 @@ public class HttpClient {
      * @return 返回创建的 ClassicHttpRequest 对象
      */
     public ClassicHttpRequest createPostRequestV2(String url, HttpEntity entity) {
-        String requestURL = GatewayV2 + url;
-        System.out.println(requestURL);
+        String requestURL = GatewayV2 + ConsoleOpenAPIPrefix + ConsoleOpenAPIVersion + url;
+        LOGGER.log(Level.FINE, "requestURL: " + requestURL);
         HttpPost httpPost = new HttpPost(requestURL);
         httpPost.setHeader("Authorization", this.SecretKey);
         httpPost.setHeader("X-Appbuilder-Origin", "appbuilder_sdk");
-        httpPost.setHeader("X-Appbuilder-Sdk-Config", "{\"appbuilder_sdk_version\":\"0.8.0\",\"appbuilder_sdk_language\":\"java\"}");
+        String platform = System.getenv("APPBUILDER_SDK_PLATFORM") != null ? System.getenv("APPBUILDER_SDK_PLATFORM")
+                : "unknown";
+        httpPost.setHeader("X-Appbuilder-Sdk-Config",
+                "{\"appbuilder_sdk_version\":\"0.9.0\",\"appbuilder_sdk_language\":\"java\",\"appbuilder_sdk_platform\":\"" + platform + "\"}");
         httpPost.setHeader("X-Appbuilder-Request-Id", java.util.UUID.randomUUID().toString());
         httpPost.setEntity(entity);
+        String headers = "headers: \n";
+        for (Header header : httpPost.getHeaders()) {
+            headers += header + "\n";
+        }
+        LOGGER.log(Level.FINE, "\n" + headers);
         return httpPost;
     }
 
-    public <T> HttpResponse<T> execute(ClassicHttpRequest request, Type bodyType) throws IOException, AppBuilderServerException {
+    public ClassicHttpRequest createGetRequestV2(String url, Map<String, Object> map) {
+        String urlParams = toQueryString(map);
+        String requestURL = GatewayV2 + ConsoleOpenAPIPrefix + ConsoleOpenAPIVersion + url + "?" + urlParams;
+        LOGGER.log(Level.FINE, "requestURL: " + requestURL);
+        HttpGet httpGet = new HttpGet(requestURL);
+        httpGet.setHeader("Authorization", this.SecretKey);
+        httpGet.setHeader("X-Appbuilder-Origin", "appbuilder_sdk");
+        String platform = System.getenv("APPBUILDER_SDK_PLATFORM") != null ? System.getenv("APPBUILDER_SDK_PLATFORM")
+                : "unknown";
+        httpGet.setHeader("X-Appbuilder-Sdk-Config",
+                "{\"appbuilder_sdk_version\":\"0.9.0\",\"appbuilder_sdk_language\":\"java\",\"appbuilder_sdk_platform\":\""
+                        + platform + "\"}");
+        httpGet.setHeader("X-Appbuilder-Request-Id", java.util.UUID.randomUUID().toString());
+        String headers = "headers: \n";
+        for (Header header : httpGet.getHeaders()) {
+            headers += header + "\n";
+        }
+        LOGGER.log(Level.FINE, "\n" + headers);
+        return httpGet;
+    }
+    
+    public ClassicHttpRequest createDeleteRequestV2(String url, Map<String, Object> map) {
+        String urlParams = toQueryString(map);
+        String requestURL = GatewayV2 + ConsoleOpenAPIPrefix + ConsoleOpenAPIVersion + url + "?" + urlParams;
+        LOGGER.log(Level.FINE, "requestURL: " + requestURL);
+        HttpDelete httpDelete = new HttpDelete(requestURL);
+        httpDelete.setHeader("Authorization", this.SecretKey);
+        httpDelete.setHeader("X-Appbuilder-Origin", "appbuilder_sdk");
+        String platform = System.getenv("APPBUILDER_SDK_PLATFORM") != null ? System.getenv("APPBUILDER_SDK_PLATFORM")
+                : "unknown";
+        httpDelete.setHeader("X-Appbuilder-Sdk-Config",
+                "{\"appbuilder_sdk_version\":\"0.9.0\",\"appbuilder_sdk_language\":\"java\",\"appbuilder_sdk_platform\":\""
+                        + platform + "\"}");
+        httpDelete.setHeader("X-Appbuilder-Request-Id", java.util.UUID.randomUUID().toString());
+        String headers = "headers: \n";
+        for (Header header : httpDelete.getHeaders()) {
+            headers += header + "\n";
+        }
+        LOGGER.log(Level.FINE, "\n" + headers);
+        return httpDelete;
+    }
+
+    public <T> HttpResponse<T> execute(ClassicHttpRequest request, Type bodyType)
+            throws IOException, AppBuilderServerException {
+        if(LOGGER.getLevel() == Level.FINE) {
+            buildCurlCommand(request);
+        }
         HttpResponse<T> httpResponse = client.execute(request, resp -> {
             Map<String, String> headers = new LinkedHashMap<>();
             for (Header header : resp.getHeaders()) {
@@ -98,9 +217,12 @@ public class HttpClient {
         return httpResponse;
     }
 
-    public <T> HttpResponse<Iterator<T>> executeSSE(ClassicHttpRequest request, Type bodyType) throws IOException, AppBuilderServerException {
+    public <T> HttpResponse<Iterator<T>> executeSSE(ClassicHttpRequest request, Type bodyType)
+            throws IOException, AppBuilderServerException {
+        if (LOGGER.getLevel() == Level.FINE) {
+            buildCurlCommand(request);
+        }
         CloseableHttpResponse resp = client.execute(request);
-
         Map<String, String> headers = new LinkedHashMap<>();
         for (Header header : resp.getHeaders()) {
             headers.put(header.getName(), header.getValue());
@@ -120,5 +242,59 @@ public class HttpClient {
                 .setRequestId(requestId)
                 .setHeaders(headers)
                 .setBody(new StreamIterator<>(resp, bodyType));
+    }
+
+    private String toQueryString(Map<String, Object> map) {
+        StringBuilder stringBuilder = new StringBuilder();
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            if (entry.getValue() != null) {
+                if (stringBuilder.length() != 0) {
+                    stringBuilder.append('&');
+                }
+                try {
+                    stringBuilder.append(URLEncoder.encode(entry.getKey(), "UTF-8"));
+                    stringBuilder.append('=');
+                    stringBuilder.append(URLEncoder.encode(entry.getValue().toString(), "UTF-8"));
+                } catch (Exception e) {
+                    // Should never happen.
+                }
+            }
+        }
+        return stringBuilder.toString();
+    }
+    
+    private void buildCurlCommand(ClassicHttpRequest request) {
+        StringBuilder curlCmd = new StringBuilder("curl");
+
+        // Append method
+        curlCmd.append(" -X ").append(request.getMethod());
+        curlCmd.append(" -L");
+        try {
+            curlCmd.append(" ").append("\'").append(request.getUri()).append("\'").append(" \\\n");
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Invalid URL: ", e);
+        }
+
+        // Append headers
+        for (Header header : request.getHeaders()) {
+            curlCmd.append("-H \'").append(header.getName()).append(": ").append(header.getValue()).append("\'");
+            curlCmd.append(" \\\n");
+        }
+
+        
+        if ("GET".equals(request.getMethod()) || "DELETE".equals(request.getMethod())) {
+            curlCmd = new StringBuilder(curlCmd.toString().replaceAll(" \\\\\n$", ""));
+        }
+
+        // Append body
+        HttpEntity entity = request.getEntity();
+        if (entity != null && entity.isRepeatable()) {
+            try {
+                String body = EntityUtils.toString(entity);
+                curlCmd.append(" -d '").append(body).append("'");
+            } catch (ParseException | IOException e) {}
+        }
+
+        LOGGER.log(Level.FINE, "Curl Command: \n" + curlCmd.toString() + "\n");
     }
 }

@@ -25,6 +25,7 @@ from appbuilder.core.components.doc_parser.base import ParseResult
 from appbuilder.core.component import Component, Message, ComponentArguments
 from appbuilder.utils.logger_util import logger
 from appbuilder.core.components.doc_parser.base import DocSegment
+from appbuilder.utils.trace.tracer_wrapper import components_run_trace, components_run_stream_trace
 
 
 class DocSplitter(Component):
@@ -58,6 +59,7 @@ class DocSplitter(Component):
 
         super(DocSplitter, self). __init__(meta=self.meta, **kwargs)
 
+    @components_run_trace
     def run(self, message: Message):
         """
         对输入的解析文档结果，处理为多个段落结果
@@ -74,6 +76,11 @@ class DocSplitter(Component):
 
         if not self.splitter_type:
             raise ValueError("splitter_type must be a value")
+
+        if not parse_result.raw:
+            raise ValueError("The exceptional purpose:Z to determine whether the ParseResult contains a raw value.\n"
+                             "The current value: maybe the value of return_raw is False.\n"
+                             "The expected value: the value of return_raw is True.")
 
         if self.splitter_type == "split_by_chunk":
             xmind_output = parse_result.raw
@@ -139,6 +146,7 @@ class ChunkSplitter(Component):
 
         super(ChunkSplitter, self). __init__(meta=self.meta, **kwargs)
 
+    @components_run_trace
     def run(self, message: Message):
         """
         对输入的解析文档结果，按照最大段落块大小、结尾分隔符等，处理为多个段落结果
@@ -249,6 +257,7 @@ class TitleSplitter(Component):
         return titles[::-1]
 
     #  按照标题层级进行切分
+    @components_run_trace
     def run(self, input_message: Message) -> Message:
         """
         对输入的解析文档结果，按照各标题层级，处理为多个段落结果

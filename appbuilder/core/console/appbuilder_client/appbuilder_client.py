@@ -15,13 +15,55 @@
 """AppBuilderClient组件"""
 import os
 import json
-
+from typing import Optional
 from appbuilder.core.component import Message, Component
 from appbuilder.core.console.appbuilder_client import data_class
 from appbuilder.core._exception import AppBuilderServerException
 from appbuilder.utils.sse_util import SSEClient
+from appbuilder.core._client import HTTPClient
 from appbuilder.utils.func_utils import deprecated
 from appbuilder.utils.logger_util import logger
+from appbuilder.utils.trace.tracer_wrapper import client_run_trace,client_tool_trace
+
+
+@client_tool_trace
+def get_app_list(limit: int = 10, after: str = "", before: str = "", secret_key: Optional[str] = None, gateway_v2: Optional[str] = None) -> list[data_class.AppOverview]:
+    """
+    该接口查询用户下状态为已发布的应用列表
+
+    Args:
+        limit (int, optional): 返回结果的最大数量，默认值为10。
+        after (str, optional): 返回结果中第一个应用的游标值，用于分页查询。默认值为空字符串。
+        before (str, optional): 返回结果中最后一个应用的游标值，用于分页查询。默认值为空字符串。
+        secret_key (Optional[str], optional): 认证密钥。如果未指定，则使用默认的密钥。默认值为None。
+        gateway_v2 (Optional[str], optional): 网关地址。如果未指定，则使用默认的地址。默认值为None。
+
+    Returns:
+        list[data_class.AppOverview]: 应用列表。
+
+    """
+
+    client = HTTPClient(secret_key=secret_key, gateway_v2=gateway_v2)
+    headers = client.auth_header_v2()
+    headers["Content-Type"] = "application/json"
+    url = client.service_url_v2("/apps")
+
+    request = data_class.AppBuilderClientAppListRequest(
+        limit=limit, after=after, before=before
+    )
+
+    response = client.session.get(
+        url=url,
+        headers=headers,
+        params=request.model_dump(),
+    )
+
+    client.check_console_response(response)
+    client.check_response_header(response)
+    data = response.json()
+    resp = data_class.AppBuilderClientAppListResponse(**data)
+    out = resp.data
+    return out
 
 
 class AppBuilderClient(Component):
@@ -57,6 +99,7 @@ class AppBuilderClient(Component):
                              " to get a valid app_id after your application is published.")
         self.app_id = app_id
 
+    @client_tool_trace
     def create_conversation(self) -> str:
         r"""创建会话并返回会话ID，会话ID在服务端用于上下文管理、绑定会话文档等，如需开始新的会话，请创建并使用新的会话ID
                 参数:
@@ -66,7 +109,7 @@ class AppBuilderClient(Component):
         """
         headers = self.http_client.auth_header_v2()
         headers["Content-Type"] = "application/json"
-        url = self.http_client.service_url_v2("/v2/app/conversation")
+        url = self.http_client.service_url_v2("/app/conversation")
         response = self.http_client.session.post(
             url, headers=headers, json={"app_id": self.app_id}, timeout=None)
         self.http_client.check_response_header(response)
@@ -74,8 +117,11 @@ class AppBuilderClient(Component):
         resp = data_class.CreateConversationResponse(**data)
         return resp.conversation_id
 
+    @client_tool_trace
     def upload_local_file(self, conversation_id, local_file_path: str) -> str:
         r"""上传文件并将文件与会话ID进行绑定，后续可使用该文件ID进行对话，目前仅支持上传xlsx、jsonl、pdf、png等文件格式
+            该接口用于在对话中上传文件供大模型处理，文件的有效期为7天并且不超过对话的有效期。一次只能上传一个文件。
+
                 参数:
                     conversation_id (str: 必须) : 会话ID
                     local_file_path (str: 必须) : 本地文件路径
@@ -93,7 +139,7 @@ class AppBuilderClient(Component):
         }
         headers = self.http_client.auth_header_v2()
         url = self.http_client.service_url_v2(
-            "/v2/app/conversation/file/upload")
+            "/app/conversation/file/upload")
         response = self.http_client.session.post(
             url, files=multipart_form_data, headers=headers)
         self.http_client.check_response_header(response)
@@ -101,6 +147,7 @@ class AppBuilderClient(Component):
         resp = data_class.FileUploadResponse(**data)
         return resp.id
 
+    @client_run_trace
     def run(self, conversation_id: str,
             query: str,
             file_ids: list = [],
@@ -130,7 +177,7 @@ class AppBuilderClient(Component):
 
         headers = self.http_client.auth_header_v2()
         headers["Content-Type"] = "application/json"
-        url = self.http_client.service_url_v2("/v2/app/conversation/runs")
+        url = self.http_client.service_url_v2("/app/conversation/runs")
         response = self.http_client.session.post(
             url, headers=headers, json=req.model_dump(), timeout=None, stream=True)
         self.http_client.check_response_header(response)
@@ -154,7 +201,8 @@ class AppBuilderClient(Component):
                     data = event.raw
                 data = json.loads(data)
             except json.JSONDecodeError as e:
-                raise AppBuilderServerException(request_id=request_id, message="json decoder failed {}".format(str(e)))
+                raise AppBuilderServerException(
+                    request_id=request_id, message="json decoder failed {}".format(str(e)))
             inp = data_class.AppBuilderClientResponse(**data)
             out = data_class.AppBuilderClientAnswer()
             _transform(inp, out)
@@ -186,7 +234,8 @@ class AgentBuilder(AppBuilderClient):
             None
 
         """
-        logger.info("AgentBuilder is deprecated, please use AppBuilderClient instead")
+        logger.info(
+            "AgentBuilder is deprecated, please use AppBuilderClient instead")
         super().__init__(app_id)
 
 
@@ -199,6 +248,7 @@ def _transform(inp: data_class.AppBuilderClientResponse, out: data_class.AppBuil
             status=ev.event_status,
             event_type=ev.event_type,
             content_type=ev.content_type,
-            detail=ev.outputs
+            detail=ev.outputs,
+            usage=ev.usage,
         )
         out.events.append(event)

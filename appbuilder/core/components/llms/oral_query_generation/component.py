@@ -27,6 +27,7 @@ from appbuilder.core.message import Message
 from appbuilder.core.component import ComponentArguments
 from appbuilder.core._exception import AppBuilderServerException
 from appbuilder.utils.logger_util import logger
+from appbuilder.utils.trace.tracer_wrapper import components_run_trace, components_run_stream_trace
 
 
 class QueryTypeChoices(Enum):
@@ -171,7 +172,6 @@ class OralQueryGeneration(CompletionBaseComponent):
         """
         if not isinstance(model_output, str):
             return model_output
-        # print(model_output)
         
         match_obj = re.search(r'```json\n(.+)\n```', model_output, flags=re.DOTALL)
 
@@ -184,7 +184,7 @@ class OralQueryGeneration(CompletionBaseComponent):
             regenerated_output = json.loads(dict_json_text) if dict_json_text is not None else model_output
 
         if output_format == 'json' or not isinstance(regenerated_output, dict):
-            return regenerated_output
+            return json.dumps(regenerated_output, ensure_ascii=False, indent=4)
 
         queries = []
         for key in ['问题', '短语']:
@@ -221,6 +221,7 @@ class OralQueryGeneration(CompletionBaseComponent):
                                                                                       response))
         return self.gene_response(response, stream)
 
+    @components_run_trace
     def run(self, message, query_type='全部', output_format='str', stream=False, temperature=1e-10, top_p=0.0):
         """
         使用给定的输入运行模型并返回结果。
@@ -228,7 +229,7 @@ class OralQueryGeneration(CompletionBaseComponent):
         Args:
             message (Message): 输入消息，用于传入query、context和answer。这是一个必需的参数。
             query_type (str, 可选): 待生成的query类型，包括问题、短语和全部（问题+短语）。默认为全部。
-            output_format (str, 可选): 输出格式，包括json和str。默认为str。
+            output_format (str, 可选): 输出格式，包括json和str，stream为True时，只能以json形式输出。默认为str。
             stream (bool, 可选): 指定是否以流式形式返回响应。默认为 False。
             temperature (float, 可选): 模型配置的温度参数，用于调整模型的生成概率。取值范围为 0.0 到 1.0，其中较低的值使生成更确定性，较高的值使生成更多样性。默认值为 1e-10。
             top_p (float, 可选): 影响输出文本的多样性，取值越大，生成文本的多样性越强。取值范围为 0.0 到 1.0，其中较低的值使生成更确定性，较高的值使生成更多样性。默认值为 0。
@@ -258,6 +259,7 @@ class OralQueryGeneration(CompletionBaseComponent):
 
         return result
 
+    @components_run_stream_trace
     def tool_eval(self, name: str, stream: bool = False, **kwargs):
         """
         tool_eval for function call

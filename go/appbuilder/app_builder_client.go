@@ -18,35 +18,102 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
+func GetAppList(req GetAppListRequest, config *SDKConfig) ([]App, error) {
+	request := http.Request{}
+	header := config.AuthHeaderV2()
+	serviceURL, err := config.ServiceURLV2("/apps")
+	if err != nil {
+		return nil, err
+	}
+
+	request.URL = serviceURL
+	request.Method = "GET"
+	header.Set("Content-Type", "application/json")
+	request.Header = header
+
+	reqMap := make(map[string]any)
+	reqJson, _ := json.Marshal(req)
+	json.Unmarshal(reqJson, &reqMap)
+	params := url.Values{}
+	for key, value := range reqMap {
+		switch v := value.(type) {
+		case float64:
+			params.Add(key, strconv.Itoa(int(v)))
+		case string:
+			if v == "" {
+				continue
+			}
+			params.Add(key, v)
+		}
+	}
+	serviceURL.RawQuery = params.Encode()
+
+	config.BuildCurlCommand(&request)
+	client := config.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 300 * time.Second}
+	}
+	resp, err := client.Do(&request)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	requestID, err := checkHTTPResponse(resp)
+	if err != nil {
+		return nil, fmt.Errorf("requestID=%s, err=%v", requestID, err)
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("requestID=%s, err=%v", requestID, err)
+	}
+	rsp := GetAppListResponse{}
+	if err := json.Unmarshal(data, &rsp); err != nil {
+		return nil, fmt.Errorf("requestID=%s, err=%v", requestID, err)
+	}
+
+	return rsp.Data, nil
+}
+
 func NewAppBuilderClient(appID string, config *SDKConfig) (*AppBuilderClient, error) {
-	if len(appID) == 0 {
-		return nil, fmt.Errorf("appID is empty")
+	if appID == "" {
+		return nil, errors.New("appID is empty")
 	}
 	if config == nil {
-		return nil, fmt.Errorf("config is nil")
+		return nil, errors.New("config is nil")
 	}
-	return &AppBuilderClient{appID: appID, sdkConfig: config, client: &http.Client{Timeout: 300 * time.Second}}, nil
+	client := config.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 300 * time.Second}
+	}
+	return &AppBuilderClient{appID: appID, sdkConfig: config, client: client}, nil
 }
 
 type AppBuilderClient struct {
 	appID     string
 	sdkConfig *SDKConfig
-	client    *http.Client
+	client    HTTPClient
+}
+
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
 func (t *AppBuilderClient) CreateConversation() (string, error) {
 	request := http.Request{}
 	header := t.sdkConfig.AuthHeaderV2()
-	serviceURL, err := t.sdkConfig.ServiceURLV2("/v2/app/conversation")
+	serviceURL, err := t.sdkConfig.ServiceURLV2("/app/conversation")
 	if err != nil {
 		return "", err
 	}
@@ -57,6 +124,7 @@ func (t *AppBuilderClient) CreateConversation() (string, error) {
 	req := map[string]string{"app_id": t.appID}
 	data, _ := json.Marshal(req)
 	request.Body = io.NopCloser(bytes.NewReader(data))
+	t.sdkConfig.BuildCurlCommand(&request)
 	resp, err := t.client.Do(&request)
 	if err != nil {
 		return "", err
@@ -70,7 +138,7 @@ func (t *AppBuilderClient) CreateConversation() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("requestID=%s, err=%v", requestID, err)
 	}
-	rsp := make(map[string]interface{})
+	rsp := make(map[string]any)
 	if err := json.Unmarshal(data, &rsp); err != nil {
 		return "", fmt.Errorf("requestID=%s, err=%v", requestID, err)
 	}
@@ -99,7 +167,7 @@ func (t *AppBuilderClient) UploadLocalFile(conversationID string, filePath strin
 	}
 	w.Close()
 	request := http.Request{}
-	serviceURL, err := t.sdkConfig.ServiceURLV2("/v2/app/conversation/file/upload")
+	serviceURL, err := t.sdkConfig.ServiceURLV2("/app/conversation/file/upload")
 	if err != nil {
 		return "", err
 	}
@@ -122,7 +190,7 @@ func (t *AppBuilderClient) UploadLocalFile(conversationID string, filePath strin
 	if err != nil {
 		return "", fmt.Errorf("requestID=%s, err=%v", requestID, err)
 	}
-	rsp := make(map[string]interface{})
+	rsp := make(map[string]any)
 	if err := json.Unmarshal(body, &rsp); err != nil {
 		return "", fmt.Errorf("requestID=%s, err=%v", requestID, err)
 	}
@@ -135,9 +203,9 @@ func (t *AppBuilderClient) UploadLocalFile(conversationID string, filePath strin
 
 func (t *AppBuilderClient) Run(conversationID string, query string, fileIDS []string, stream bool) (AppBuilderClientIterator, error) {
 	if len(conversationID) == 0 {
-		return nil, fmt.Errorf("conversationID mustn't be empty")
+		return nil, errors.New("conversationID mustn't be empty")
 	}
-	m := map[string]interface{}{"app_id": t.appID,
+	m := map[string]any{"app_id": t.appID,
 		"conversation_id": conversationID,
 		"query":           query,
 		"file_ids":        fileIDS,
@@ -145,7 +213,7 @@ func (t *AppBuilderClient) Run(conversationID string, query string, fileIDS []st
 	}
 	request := http.Request{}
 
-	serviceURL, err := t.sdkConfig.ServiceURLV2("/v2/app/conversation/runs")
+	serviceURL, err := t.sdkConfig.ServiceURLV2("/app/conversation/runs")
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +225,7 @@ func (t *AppBuilderClient) Run(conversationID string, query string, fileIDS []st
 	request.Header = header
 	data, _ := json.Marshal(m)
 	request.Body = io.NopCloser(bytes.NewReader(data))
+	t.sdkConfig.BuildCurlCommand(&request)
 	resp, err := t.client.Do(&request)
 	if err != nil {
 		return nil, err
@@ -168,7 +237,6 @@ func (t *AppBuilderClient) Run(conversationID string, query string, fileIDS []st
 	r := NewSSEReader(1024*1024, bufio.NewReader(resp.Body))
 	if stream {
 		return &AppBuilderClientStreamIterator{requestID: requestID, r: r, body: resp.Body}, nil
-	} else {
-		return &AppBuilderClientOnceIterator{body: resp.Body}, nil
 	}
+	return &AppBuilderClientOnceIterator{body: resp.Body}, nil
 }

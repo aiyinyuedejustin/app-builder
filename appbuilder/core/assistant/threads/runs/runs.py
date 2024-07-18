@@ -19,8 +19,10 @@ from appbuilder.core.assistant.threads.runs.stream_helper import AssistantStream
 from appbuilder.core.assistant.threads.runs.stream_helper import AssistantEventHandler
 from appbuilder.core.assistant.type import thread_type
 from appbuilder.core.assistant.type import assistant_type
+from appbuilder.core.assistant.type import public_type
 from appbuilder.core._client import AssistantHTTPClient
 from appbuilder.utils.sse_util import SSEClient
+from appbuilder.utils.trace.tracer_wrapper import assistent_tool_trace, assistant_run_trace, assistent_stream_run_trace, assistent_stream_run_with_handler_trace
 
 
 
@@ -31,7 +33,8 @@ class Runs():
     @property
     def steps(self) -> Steps:
         return Steps()
-
+    
+    @assistant_run_trace
     def run(self,
             assistant_id: str,
             thread_id: Optional[str] = "",
@@ -44,6 +47,9 @@ class Runs():
             tools: Optional[list[assistant_type.AssistantTool]] = [],
             metadata: Optional[dict] = {},
             tool_output: Optional[thread_type.ToolOutput] = None,
+            model_parameters: Optional[public_type.AssistantModelParameters] = None,
+            user_info: Optional[public_type.AssistantUserInfo] = None,
+            user_loc: Optional[public_type.AssistantUserLoc] = None,
             ) -> thread_type.RunResult:
         """
         Args:
@@ -58,12 +64,14 @@ class Runs():
             tools (Optional[list[assistant_type.AssistantTool]], optional): 工具列表. Defaults to [].
             metadata (Optional[dict], optional): 元数据. Defaults to {}.
             tool_output (Optional[thread_type.ToolOutput], optional): 工具输出. Defaults to None.
-
+            model_parameters (Optional[public_type.AssistantModelParameters], optional): 模型运行参数. Defaults to None.
+            user_info (Optional[public_type.AssistantUserInfo], optional): 用户身份信息. Defaults to None.
+            user_loc (Optional[public_type.AssistantUserLoc], optional): 用户定位信息. Defaults to None.
         Returns:
             thread_type.RunResult: 运行结果
 
         Raises:
-            ValueError: thread_id和thread不能同时为空
+            ValueError: thread_id和thread不能同时为空,model_parameters的各个参数不在规定范围内
 
         Note:
             1. 如果thread_id没有传，则thread必须要传值
@@ -81,7 +89,22 @@ class Runs():
         """
         if thread_id == "" and thread is None:
             raise ValueError("Runs().run() argument thread_id && thread can't be empty at the same time")
+        
+        if model_parameters:
+            chat_temperature = model_parameters.chat_parameters.temperature
+            chat_top_p = model_parameters.chat_parameters.top_p
+            chat_penalty_score = model_parameters.chat_parameters.penalty_score
+            thought_temperature = model_parameters.thought_parameters.temperature
+            thought_top_p = model_parameters.thought_parameters.top_p
+            thought_penalty_score = model_parameters.thought_parameters.penalty_score
 
+            if chat_temperature < 0 or chat_temperature > 1 or thought_temperature < 0 or thought_temperature > 1:
+                raise ValueError("chat_temperature and thought_temperature must be in range [0, 1]")
+            if chat_top_p < 0 or chat_top_p > 1 or thought_top_p < 0 or thought_top_p > 1:
+                raise ValueError("chat_top_p and thought_top_p must be in range [0, 1]")
+            if chat_penalty_score < 1 or chat_penalty_score > 2 or thought_penalty_score < 1 or thought_penalty_score > 2:
+                raise ValueError("chat_penalty_score and thought_penalty_score must be in range [1, 2]")
+            
         req = thread_type.AssistantRunRequest(
             thread_id=thread_id,
             thread=thread,
@@ -91,10 +114,13 @@ class Runs():
             instructions=instructions,
             thought_instructions=thought_instructions,
             chat_instructions=chat_instructions,
+            model_parameters = model_parameters,
             stream=False,
             tools=tools,
             metadata=metadata,
-            tool_output=tool_output
+            tool_output=tool_output,
+            user_info=user_info,
+            user_loc=user_loc
         )
 
         response = self._http_client.session.post(
@@ -125,6 +151,9 @@ class Runs():
                    tools: Optional[list[assistant_type.AssistantTool]] = [],
                    metadata: Optional[dict] = {},
                    tool_output: Optional[thread_type.ToolOutput] = None,
+                   model_parameters: Optional[public_type.AssistantModelParameters] = None,
+                   user_info: Optional[public_type.AssistantUserInfo] = None,
+                   user_loc: Optional[public_type.AssistantUserLoc] = None,
                    ):
         """
         启动一个流式运行的对话，用于处理对话流中的消息。
@@ -141,12 +170,13 @@ class Runs():
             tools (Optional[list[assistant_type.AssistantTool]], optional): 使用的工具列表。默认为空列表。
             metadata (Optional[dict], optional): 元数据字典。默认为空字典。
             tool_output (Optional[thread_type.ToolOutput], optional): 工具输出对象。默认为None。
+            model_parameters (Optional[public_type.AssistantModelParameters], optional): 模型运行参数. Defaults to None.
         
         Returns:
             Iterator[thread_type.AssistantRunEvent]: 返回一个迭代器，用于遍历流式运行中的事件。
         
         Raises:
-            ValueError: 如果thread_id和thread参数同时为空，则会引发ValueError异常。
+            ValueError: 如果thread_id和thread参数同时为空，则会引发ValueError异常。model_parameters的各个参数不在规定范围内。
         
         Note:
             1. 如果thread_id没有传，则thread必须要传值。
@@ -164,6 +194,22 @@ class Runs():
         """
         if thread_id == "" and thread is None:
             raise ValueError("Runs().run() argument thread_id and thread can't be empty at the same time")
+        
+        if model_parameters:
+    
+            chat_temperature = model_parameters.chat_parameters.temperature
+            chat_top_p = model_parameters.chat_parameters.top_p
+            chat_penalty_score = model_parameters.chat_parameters.penalty_score
+            thought_temperature = model_parameters.thought_parameters.temperature
+            thought_top_p = model_parameters.thought_parameters.top_p
+            thought_penalty_score = model_parameters.thought_parameters.penalty_score
+
+            if chat_temperature < 0 or chat_temperature > 1 or thought_temperature < 0 or thought_temperature > 1:
+                raise ValueError("chat_temperature and thought_temperature must be in range [0, 1]")
+            if chat_top_p < 0 or chat_top_p > 1 or thought_top_p < 0 or thought_top_p > 1:
+                raise ValueError("chat_top_p and thought_top_p must be in range [0, 1]")
+            if chat_penalty_score < 1 or chat_penalty_score > 2 or thought_penalty_score < 1 or thought_penalty_score > 2:
+                raise ValueError("chat_penalty_score and thought_penalty_score must be in range [1, 2]")
 
         req = thread_type.AssistantRunRequest(
             thread_id=thread_id,
@@ -175,9 +221,12 @@ class Runs():
             thought_instructions=thought_instructions,
             chat_instructions=chat_instructions,
             stream=True,
+            model_parameters=model_parameters,
             tools=tools,
             metadata=metadata,
-            tool_output=tool_output
+            tool_output=tool_output,
+            user_info=user_info,
+            user_loc=user_loc
         )
 
         response = self._http_client.session.post(
@@ -187,9 +236,9 @@ class Runs():
             stream=True,
             timeout=None
         )
-
         return response
 
+    @assistent_stream_run_trace
     def stream_run(self,
                    assistant_id: str,
                    thread_id: Optional[str] = "",
@@ -202,6 +251,9 @@ class Runs():
                    tools: Optional[list[assistant_type.AssistantTool]] = [],
                    metadata: Optional[dict] = {},
                    tool_output: Optional[thread_type.ToolOutput] = None,
+                   model_parameters: Optional[public_type.AssistantModelParameters] = None,
+                   user_info: Optional[public_type.AssistantUserInfo] = None,
+                   user_loc: Optional[public_type.AssistantUserLoc] = None,
                    ) -> Union[thread_type.StreamRunStatus, thread_type.StreamRunMessage, None]:
         """
         启动一个流式运行的对话，用于处理对话流中的消息。
@@ -218,6 +270,7 @@ class Runs():
             tools (Optional[list[assistant_type.AssistantTool]], optional): 使用的工具列表。默认为空列表。
             metadata (Optional[dict], optional): 元数据字典。默认为空字典。
             tool_output (Optional[thread_type.ToolOutput], optional): 工具输出对象。默认为None。
+            model_parameters (Optional[public_type.AssistantModelParameters], optional): 模型参数对象。默认为None。
 
         Returns:
             Union[thread_type.StreamRunStatus, thread_type.StreamRunMessage, None]: 返回一个迭代器，每次迭代返回一个处理结果对象，可能是 StreamRunStatus 或 StreamRunMessage。
@@ -240,14 +293,18 @@ class Runs():
             instructions=instructions,
             thought_instructions=thought_instructions,
             chat_instructions=chat_instructions,
+            model_parameters=model_parameters,
             tools=tools,
             metadata=metadata,
-            tool_output=tool_output
+            tool_output=tool_output,
+            user_info=user_info,
+            user_loc=user_loc
         )
         self._http_client.check_response_header(response)
         sse_client = SSEClient(response)
         return self._iterate_events(sse_client.events())
 
+    @assistent_stream_run_with_handler_trace
     def stream_run_with_handler(self,
                    assistant_id: str,
                    thread_id: Optional[str] = "",
@@ -260,7 +317,10 @@ class Runs():
                    tools: Optional[list[assistant_type.AssistantTool]] = [],
                    metadata: Optional[dict] = {},
                    tool_output: Optional[thread_type.ToolOutput] = None,
-                   event_handler: Optional[AssistantEventHandler] = None
+                   event_handler: Optional[AssistantEventHandler] = None,
+                   model_parameters: Optional[public_type.AssistantModelParameters] = None,
+                   user_info: Optional[public_type.AssistantUserInfo] = None,
+                   user_loc: Optional[public_type.AssistantUserLoc] = None,
                    ) -> AssistantStreamManager:
         response = self._stream(
             assistant_id=assistant_id,
@@ -271,9 +331,12 @@ class Runs():
             instructions=instructions,
             thought_instructions=thought_instructions,
             chat_instructions=chat_instructions,
+            model_parameters=model_parameters,
             tools=tools,
             metadata=metadata,
-            tool_output=tool_output
+            tool_output=tool_output,
+            user_info=user_info,
+            user_loc=user_loc
         )
         self._http_client.check_response_header(response)
 
@@ -315,6 +378,8 @@ class Runs():
 
             yield result
 
+
+    @assistent_tool_trace
     def submit_tool_outputs(self,
                             run_id: str,
                             thread_id: str,
@@ -356,6 +421,7 @@ class Runs():
         resp = thread_type.RunResult(**data)
         return resp
 
+    @assistent_tool_trace
     def cancel(self, run_id: str, thread_id: str) -> thread_type.RunResult:
         """
         取消指定线程的运行
@@ -391,6 +457,7 @@ class Runs():
         resp = thread_type.RunResult(**data)
         return resp
 
+    @assistent_tool_trace
     def list(self, thread_id: str, limit: int = 20,
              order: str = 'desc', after: str = "", before: str = "") -> thread_type.RunListResponse:
         """
@@ -435,6 +502,7 @@ class Runs():
         resp = thread_type.RunListResponse(**data)
         return resp
 
+    @assistent_tool_trace
     def query(self, thread_id: str, run_id: str) -> thread_type.RunResult:
         """
         根据thread_id和run_id，查询run的详情

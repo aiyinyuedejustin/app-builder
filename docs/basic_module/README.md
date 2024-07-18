@@ -6,20 +6,22 @@ AppBuilder面向开发者提供AI原生应用一站式开发工具，包括基�
 封装程度由高至低，AppBuilder 提供了三种类型的SDK
 | 分类   | 场景及使用方式   | 百度云文档链接         | SDK 文档链接|
 |--------|--------|------------|------------|
-| 端到端应用 | 在 AppBuilder 产品界面上通过零代码、低代码方式创建的 AI 原生应用，支持通过应用 API/SDK 进行调用 | [应用API及SDK](https://cloud.baidu.com/doc/AppBuilder/s/Flpv3oxup) | [AppBuilder Client SDK](./appbuilder_client.md) |
-| 流程编排 | 基于 Assistants API，可通过全代码形式创建和调试专属智能体（Agent） | [AssistantAPI](https://cloud.baidu.com/doc/AppBuilder/s/nluzkdben) | [AssistantSDK](./assistant_sdk.md) |
-| 工具组件 | 基于组件 SDK，可调用包括大模型组件、AI能力组件等在内的多种组件 | [组件SDK](https://cloud.baidu.com/doc/AppBuilder/s/Glqb6dfiz) | [组件列表](./components.md) |
+| 端到端应用 | 在 AppBuilder 产品界面上通过零代码、低代码方式创建的 AI 原生应用，支持通过应用 API/SDK 进行调用 | [应用API及SDK](https://cloud.baidu.com/doc/AppBuilder/s/Plvggbuzc) | [AppBuilder Client SDK](https://github.com/baidubce/app-builder/blob/master/docs/basic_module/appbuilder_client.md) |
+| 流程编排 | 基于 Assistants API，可通过全代码形式创建和调试专属智能体（Agent） | [AssistantAPI](https://cloud.baidu.com/doc/AppBuilder/s/nluzkdben) | [AssistantSDK](https://github.com/baidubce/app-builder/blob/master/docs/basic_module/assistant_sdk.md) |
+| 工具组件 | 基于组件 SDK，可调用包括大模型组件、AI能力组件等在内的多种组件 | [组件SDK](https://cloud.baidu.com/doc/AppBuilder/s/Glqb6dfiz) | [组件列表](https://cloud.baidu.com/doc/AppBuilder/s/Glqb6dfiz#3%E3%80%81%E5%BC%80%E9%80%9A%E7%BB%84%E4%BB%B6%E6%9C%8D%E5%8A%A1) |
 
 
 ## 本文档目录的内容
-
-1. [获取模型列表](./get_model_list.md)
-2. [端到端应用 - AppBuilder Client SDK](./appbuilder_client.md)
-3. [端到端应用 - Dataset知识库SDK](./dataset.md)
-4. [端到端应用 - RAG应用 SDK](./rag.md)
-5. [流程编排 - Assistant SDK](./assistant_sdk.md)
-6. [基础组件 - 组件列表](./components.md)
-
+- 平台功能 SDK: 支持Pyhon/Java/Go
+    - [应用管理](/docs/basic_module/get_app_list.md)
+    - [应用调用 AppBuilderClient SDK](/docs/basic_module/appbuilder_client.md) 
+    - [知识库管理 KnowledgeBase SDK](/docs/basic_module/knowledgebase.md)
+- Assistant SDK：支持Python
+    - [Assistant SDK 快速开始](/docs/basic_module/assistant_sdk.md)
+    - [Assistant SDK API说明](/docs/basic_module/assistant_type.md)
+- AI基础能力组件 SDK：支持Python
+    - [获取模型列表](/docs/basic_module/get_model_list.md)
+    - [基础能力组件](/docs/basic_module/components.md)
 
 ## 功能示例
 

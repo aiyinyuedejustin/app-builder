@@ -2,15 +2,15 @@
 
 该文档目录包含以下内容：
 
-- [二次开发基本介绍](./README.md)
-- [AppBuilder SDK 运行环境超参配置说明](./env.md)
+- [二次开发基本介绍](https://github.com/baidubce/app-builder/blob/master/docs/develop_guide/README.md)
+- [AppBuilder SDK 运行环境超参配置说明](https://github.com/baidubce/app-builder/blob/master/docs/develop_guide/env.md)
 
 
 ## 二次开发
 当前已集成Python版本AppBuilder-SDK 0.7.1及相关依赖，方便开发者融入个人已有的大模型应用程序。此部分仍在不断建设中。
 二次开发可以采用官方提供的开发镜像，便于快速安装各种依赖库。
 ``` shell
-docker pull registry.baidubce.com/appbuilder/appbuilder-sdk-devel:0.7.1
+docker pull registry.baidubce.com/appbuilder/appbuilder-sdk-devel:0.9.0
 ```
 
 ### 消息(Message)
